@@ -88,7 +88,7 @@ bool isTrigger(String hour, String minute){
       token = strtok(NULL, " ");
    }
 
-   Serial.println("dateDetail: " + dateDetail[3]);
+   //Serial.println("dateDetail: " + dateDetail[3]);
    String timeDetail[3];
   i = 0;
    char timeChar[dateDetail[3].length()];
@@ -107,8 +107,8 @@ bool isTrigger(String hour, String minute){
       token = strtok(NULL, ":");
    }
 
-   Serial.println("hour: " + timeDetail[0]);
-   Serial.println("minute: " + timeDetail[1]);
+   //Serial.println("hour: " + timeDetail[0]);
+   //Serial.println("minute: " + timeDetail[1]);
 
    if(timeDetail[0] == hour && timeDetail[1] == minute){
     return true;

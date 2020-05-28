@@ -35,9 +35,145 @@ String deviceConfig;
 String deviceCommand = "none";
 
 int relay[] = {12, 13};
+///////////////////////////////
 
+// Initialize WiFi and MQTT for this board
+Client *netClient;
+CloudIoTCoreDevice *device;
+CloudIoTCoreMqtt *mqtt;
+MQTTClient *mqttClient;
+unsigned long iat = 0;
+String jwt;
+
+///////////////////////////////
+// Helpers specific to this board
+///////////////////////////////
+String getDefaultState() {
+
+    preferences.begin("config", false);
+       String selfVersion  =  preferences.getString("version", "none");     
+    preferences.end();
+  
+  const size_t capacity = 3*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4);
+  DynamicJsonDocument doc(capacity);
+  
+  doc["version"] = selfVersion;
+  doc["status"] = "connected";
+
+  
+  String json ="" ;
+  serializeJson(doc, json);
+
+  return json;
+}
+
+String getCommandStatus(String now, int port, const char* status, int duration){
+
+
+
+    preferences.begin("config", false);
+       String selfVersion  =  preferences.getString("version", "none");     
+    preferences.end();
+  
+  const size_t capacity = 3*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4);
+  DynamicJsonDocument doc(capacity);
+  
+  doc["version"] = selfVersion;
+  doc["status"] = "commandExecuted";
+
+  JsonObject lastActivity = doc.createNestedObject("lastActivity");
+  lastActivity["date"] = now;
+  
+  JsonObject lastActivity_command = lastActivity.createNestedObject("command");
+  lastActivity_command["port"] = port;
+  lastActivity_command["status"] = status;
+  lastActivity_command["duration"] = duration;
+
+
+ String json ="" ;
+  serializeJson(doc, json);
+  Serial.println("updating status");
+  Serial.println(json);
+
+//char* json ="command" ;
+  return json;
+}
+String getScheduleStatus(String now, int port, const char* status, String time, int duration){
+    preferences.begin("config", false);
+       String selfVersion  =  preferences.getString("version", "none");     
+    preferences.end();
+  
+  const size_t capacity = 3*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4);
+  DynamicJsonDocument doc(capacity);
+  
+  doc["version"] = selfVersion;
+  doc["status"] = "scheduleTrigger";
+
+  JsonObject lastActivity = doc.createNestedObject("lastActivity");
+  lastActivity["date"] = now;
+  
+  JsonObject lastActivity_timer = lastActivity.createNestedObject("timer");
+  lastActivity_timer["port"] = port;
+  lastActivity_timer["status"] = status;
+  lastActivity_timer["time"] = time;
+  lastActivity_timer["duration"] = duration;
+  
+ String json ="" ;
+  serializeJson(doc, json);
+  Serial.println("updating status");
+  Serial.println(json);
+
+  return json;
+
+}
+
+String getJwt() {
+  iat = time(nullptr);
+  Serial.println("Refreshing JWT");
+  jwt = device->createJWT(iat, jwt_exp_secs);
+  return jwt;
+}
+
+
+/*
+void connectWifi() {
+  Serial.print("checking wifi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+  }
+}*/
+
+///////////////////////////////
+// Orchestrates various methods from preceeding code.
+///////////////////////////////
+bool publishTelemetry(String data) {
+  return mqtt->publishTelemetry(data);
+}
+
+bool publishTelemetry(const char* data, int length) {
+  return mqtt->publishTelemetry(data, length);
+}
+
+bool publishTelemetry(String subfolder, String data) {
+  return mqtt->publishTelemetry(subfolder, data);
+}
+
+bool publishTelemetry(String subfolder, const char* data, int length) {
+  return mqtt->publishTelemetry(subfolder, data, length);
+}
+bool publishState(String data) {
+  return mqtt->publishState(data);
+}
+
+
+void connect() {
+  //connectWifi();
+  mqtt->mqttConnect();
+}
 
 void executeCommand(){
+  String now = getLocalTime();
 
   char json[deviceCommand.length()];
   deviceCommand.toCharArray(json, deviceCommand.length());
@@ -53,17 +189,6 @@ void executeCommand(){
   const char* status = doc["status"]; // "on"
   int duration = doc["duration"]; // 30
 
-
-  Serial.print("port: ");
-  Serial.println(port);
-  
-  Serial.print("status: ");
-  Serial.println(status);
-
-  Serial.print("duration: ");
-  Serial.println(duration);
-
-
   if(strcmp(status,"on") == 0){
     digitalWrite(relay[port], HIGH);   // Turn on relay 1
     if(duration > 0){
@@ -77,12 +202,17 @@ void executeCommand(){
       digitalWrite(relay[port], HIGH);
     }
   }
-  
 
   deviceCommand = "none";
+
+  Serial.println("Update status:");
+  Serial.println(publishState(getCommandStatus(now, port, status, duration)));
+
 }
 
 void checkConfig(){
+
+  String now = getLocalTime();
 
   char json[deviceConfig.length()];
   deviceConfig.toCharArray(json, deviceConfig.length());
@@ -93,10 +223,20 @@ void checkConfig(){
   //const char* json = "{\"schedule\":{\"enable\":true,\"timer\":[{\"port\":0,\"time\":\"07:00\",\"duration\":10},{\"port\":0,\"time\":\"12:00\",\"duration\":10},{\"port\":0,\"time\":\"17:00\",\"duration\":10},{\"port\":1,\"time\":\"07:00\",\"duration\":10},{\"port\":1,\"time\":\"12:00\",\"duration\":10},{\"port\":1,\"time\":\"17:00\",\"duration\":10}]}}";
   
   deserializeJson(doc, json);
-  
+  const char* configVersion = doc["version"]; // "0.1";
   bool schedule_enable = doc["schedule"]["enable"]; // true
-  
   JsonArray schedule_timer = doc["schedule"]["timer"];
+
+//check firmware version
+    preferences.begin("config", false);
+       String selfVersion  =  preferences.getString("version", "none");     
+    preferences.end();
+  if(selfVersion != String(configVersion)){
+    updateFirmware(configVersion);
+  
+  }
+
+  
 
   char *token;
 
@@ -111,10 +251,11 @@ void checkConfig(){
 
      bool trigger = isTrigger(timeStr.substring(0, timeStr.indexOf(":")), timeStr.substring(timeStr.indexOf(":")+1));
      
-    Serial.print("Is triger for " + timeStr + ": ");
-    Serial.println(trigger);
+    //Serial.print("Is triger for " + timeStr + ": ");
+    //Serial.println(trigger);
     if(trigger){
-    
+
+
       if(strcmp(status,"on") == 0){
         digitalWrite(relay[port], HIGH);   // Turn on relay 1
         if(duration > 0){
@@ -129,6 +270,8 @@ void checkConfig(){
         }
       }
 
+      
+      Serial.println(publishState(getScheduleStatus(now, port, status, timeStr, duration)));
       delay(60000-1000*duration+1);
     
     }
@@ -192,63 +335,7 @@ void messageReceived(String &topic, String &payload) {
     executeCommand();
   }
 }
-///////////////////////////////
 
-// Initialize WiFi and MQTT for this board
-Client *netClient;
-CloudIoTCoreDevice *device;
-CloudIoTCoreMqtt *mqtt;
-MQTTClient *mqttClient;
-unsigned long iat = 0;
-String jwt;
-
-///////////////////////////////
-// Helpers specific to this board
-///////////////////////////////
-String getDefaultSensor() {
-  return  "Wifi: " + String(WiFi.RSSI()) + "db";
-}
-
-String getJwt() {
-  iat = time(nullptr);
-  Serial.println("Refreshing JWT");
-  jwt = device->createJWT(iat, jwt_exp_secs);
-  return jwt;
-}
-
-
-/*
-void connectWifi() {
-  Serial.print("checking wifi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(1000);
-  }
-}*/
-
-///////////////////////////////
-// Orchestrates various methods from preceeding code.
-///////////////////////////////
-bool publishTelemetry(String data) {
-  return mqtt->publishTelemetry(data);
-}
-
-bool publishTelemetry(const char* data, int length) {
-  return mqtt->publishTelemetry(data, length);
-}
-
-bool publishTelemetry(String subfolder, String data) {
-  return mqtt->publishTelemetry(subfolder, data);
-}
-
-bool publishTelemetry(String subfolder, const char* data, int length) {
-  return mqtt->publishTelemetry(subfolder, data, length);
-}
-
-void connect() {
-  //connectWifi();
-  mqtt->mqttConnect();
-}
 
 void setupCloudIoT() {
   device = new CloudIoTCoreDevice(

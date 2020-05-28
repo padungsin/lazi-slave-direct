@@ -1,0 +1,26 @@
+{
+	"version": "0.2",
+	"schedule": {
+		"enable": false,
+		"timer": [
+			{
+				"port": 0,
+				"status": "on",
+				"time": "07:00",
+				"duration": 60
+			},
+			{
+				"port": 0,
+				"status": "on",
+				"time": "12:00",
+				"duration": 60
+			},
+			{
+				"port": 0,
+				"status": "on",
+				"time": "17:00",
+				"duration": 60
+			}
+		]
+	}
+}

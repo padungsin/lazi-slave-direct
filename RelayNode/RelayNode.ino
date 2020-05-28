@@ -2,9 +2,10 @@
 #include "esp_system.h"
 #include <string.h>
 
-
 #include "wifi_connect.h"  // WiFi connection
+#include "ota.h"
 #include "esp32-mqtt.h"
+
 
 int relay1 = 12;
 int relay2 = 13;
@@ -50,7 +51,7 @@ void loop()
     // publish a message roughly every second.
     if (millis() - lastMillis > 60000) {
       lastMillis = millis();
-      publishTelemetry(getDefaultSensor());
+      publishState(getDefaultState());
     }
 
     checkConfig();

@@ -56,13 +56,6 @@ String getLocalTime()
     currentTime.replace("\r", "");
     currentTime.replace("\n", "");
   }
-/*
-    Serial.println(timeStruct->tm_year);
-    Serial.println(timeStruct->tm_mon);
-    Serial.println(timeStruct->tm_mday);
-    Serial.println(timeStruct->tm_hour);
-    Serial.println(timeStruct->tm_min);
-    Serial.println(timeStruct->tm_sec);*/
   return currentTime;
 }
 

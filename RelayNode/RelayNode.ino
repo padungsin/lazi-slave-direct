@@ -7,8 +7,6 @@
 #include "esp32-mqtt.h"
 
 
-int relay1 = 12;
-int relay2 = 13;
 
   
 
@@ -19,8 +17,12 @@ void setup() {
 
 
 
- pinMode(relay1, OUTPUT);     // Initialize the relay1 pin as an output
- pinMode(relay2, OUTPUT);     // Initialize the relay2 pin as an output
+ pinMode(foggyValve, OUTPUT);     // Initialize the relay1 pin as an output
+ pinMode(wateringValve, OUTPUT);     // Initialize the relay2 pin as an output
+ pinMode(wateringPump, OUTPUT);     // Initialize the relay1 pin as an output
+ pinMode(mixFertilizerPump, OUTPUT);     // Initialize the relay2 pin as an output
+ pinMode(potassiumPump, OUTPUT);     // Initialize the relay1 pin as an output
+ pinMode(foliarPump, OUTPUT);     // Initialize the relay2 pin as an output
 
   delay(2000);
 } //  END setup()
@@ -54,7 +56,7 @@ void loop()
       publishState(getDefaultState());
     }
 
-    checkConfig();
+    process();
 
     delay(500);
 /*    if(deviceCommand != "none"){
@@ -66,6 +68,6 @@ void loop()
   { // WiFi DOWN
     wifiReconnect();
     delay( 1000 );  
-    digitalWrite(relay1, LOW);
+    //digitalWrite(relay1, LOW);
   }  // END WiFi down 
 } // END loop()

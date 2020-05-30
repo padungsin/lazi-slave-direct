@@ -1,5 +1,22 @@
+[
+
 {
-	"port": 0,
+	"status": "start-template",
+	"mode": "melon",
+	"range": "medium",
+	"day": 1,
+	"port": "foggyValve",
+	"duration": 5
+},
+{
+	"status": "set-day",
+	"day": 13
+},
+{
 	"status": "on",
+	"port": "foggyValve",
 	"duration": 5
 }
+
+]
+

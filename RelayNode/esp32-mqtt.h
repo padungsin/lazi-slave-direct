@@ -27,6 +27,8 @@
 #include <CloudIoTCoreMqtt.h>
 #include "ciotc_config.h" // Update this file with your configuration
 
+JsonObject templateObject;
+JsonArray timerArray;
 
 const int timeZone = 1;
 
@@ -34,7 +36,13 @@ const int timeZone = 1;
 String deviceConfig;
 String deviceCommand = "none";
 
-int relay[] = {12, 13};
+int foggyValve = 12;
+int wateringValve = 13;
+int wateringPump = 14;
+int mixFertilizerPump = 27;
+int potassiumPump = 32;
+int foliarPump = 33;
+
 ///////////////////////////////
 
 // Initialize WiFi and MQTT for this board
@@ -53,29 +61,44 @@ String getDefaultState() {
     preferences.begin("config", false);
        String selfVersion  =  preferences.getString("version", "none");     
     preferences.end();
+
+
   
-  const size_t capacity = 3*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4);
+  const size_t capacity = JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(6);
   DynamicJsonDocument doc(capacity);
   
   doc["version"] = selfVersion;
   doc["status"] = "connected";
+  
+  if(templateObject != NULL){
 
+
+    
+    doc["mode"] = templateObject["mode"];
+    doc["range"] = templateObject["range"];
+
+    preferences.begin("template", false);
+       int day = preferences.getInt("day", 0);     
+    preferences.end();
+    
+    doc["day"] = day;
+  }
+
+  if(timerArray != NULL && sizeof(timerArray) > 0){
+    doc["timer"] = sizeof(timerArray);
+  }
   
   String json ="" ;
   serializeJson(doc, json);
-
   return json;
 }
 
-String getCommandStatus(String now, int port, const char* status, int duration){
-
-
-
+String getCommandStatus(String now, const char* mode, const char* range, const char* status, int day, const char* port, int duration){
     preferences.begin("config", false);
        String selfVersion  =  preferences.getString("version", "none");     
     preferences.end();
   
-  const size_t capacity = 3*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4);
+  const size_t capacity = 2*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5);
   DynamicJsonDocument doc(capacity);
   
   doc["version"] = selfVersion;
@@ -85,10 +108,16 @@ String getCommandStatus(String now, int port, const char* status, int duration){
   lastActivity["date"] = now;
   
   JsonObject lastActivity_command = lastActivity.createNestedObject("command");
-  lastActivity_command["port"] = port;
-  lastActivity_command["status"] = status;
-  lastActivity_command["duration"] = duration;
 
+
+  if(strcmp(status, "set-day") == 0){
+    lastActivity_command["status"] = status;
+    lastActivity_command["day"] = day;
+  }else{
+    lastActivity_command["status"] = status;
+    lastActivity_command["port"] = port;
+    lastActivity_command["duration"] = duration;
+  }
 
  String json ="" ;
   serializeJson(doc, json);
@@ -98,12 +127,12 @@ String getCommandStatus(String now, int port, const char* status, int duration){
 //char* json ="command" ;
   return json;
 }
-String getScheduleStatus(String now, int port, const char* status, String time, int duration){
+String getScheduleStatus(String now, String port, const char* status, String time, int duration){
     preferences.begin("config", false);
        String selfVersion  =  preferences.getString("version", "none");     
     preferences.end();
   
-  const size_t capacity = 3*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4);
+  const size_t capacity = 2*JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5);
   DynamicJsonDocument doc(capacity);
   
   doc["version"] = selfVersion;
@@ -125,6 +154,41 @@ String getScheduleStatus(String now, int port, const char* status, String time, 
 
   return json;
 
+}
+
+String getProcessActivityStatus(String now, String activity){
+  preferences.begin("config", false);
+     String selfVersion  =  preferences.getString("version", "none");     
+  preferences.end();
+  
+  const size_t capacity = JSON_OBJECT_SIZE(1) + 2*JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(6);
+  DynamicJsonDocument doc(capacity);
+  
+  doc["version"] = selfVersion;
+  doc["status"] = "process-template";
+
+  JsonObject lastActivity = doc.createNestedObject("lastActivity");
+  lastActivity["date"] = now;
+  
+  doc["mode"] = templateObject["mode"];
+  doc["range"] = templateObject["range"];
+
+  preferences.begin("template", false);
+    int day = preferences.getInt("day", 0);     
+  preferences.end();
+  
+  doc["day"] = day;
+
+  JsonObject lastActivity_template = lastActivity.createNestedObject("template");
+  lastActivity_template["activity"] = activity;
+
+  String json ="" ;
+  serializeJson(doc, json);
+  Serial.println("updating status");
+  Serial.println(json);
+
+  return json;
+  
 }
 
 String getJwt() {
@@ -167,6 +231,36 @@ bool publishState(String data) {
 }
 
 
+//utility
+int getPort(const char* portName){
+  if(strcmp(portName, "foggyValve") == 0){
+    return 12;
+  }
+
+  if(strcmp(portName, "wateringValve") == 0){
+    return 13;
+  }
+
+  if(strcmp(portName, "wateringPump") == 0){
+    return 14;
+  }
+
+  if(strcmp(portName, "mixFertilizerPump") == 0){
+    return 127;
+  }
+
+  if(strcmp(portName, "potassiumPump") == 0){
+    return 32;
+  }
+
+  if(strcmp(portName, "foliarPump") == 0){
+    return 33;
+  }
+
+  return 0;
+}
+
+
 void connect() {
   //connectWifi();
   mqtt->mqttConnect();
@@ -178,74 +272,57 @@ void executeCommand(){
   char json[deviceCommand.length()];
   deviceCommand.toCharArray(json, deviceCommand.length());
   
-  const size_t capacity = JSON_OBJECT_SIZE(3) + 30;
+  const size_t capacity = JSON_OBJECT_SIZE(5) + 70;
   DynamicJsonDocument doc(capacity);
-  
-  //const char* json = "{\"port\":30,\"status\":\"on\",\"duration\":30}";
-  
+
   deserializeJson(doc, json);
   
-  int port = doc["port"]; // 30
+  const char*  port = doc["port"]; // 30
   const char* status = doc["status"]; // "on"
+  const char* mode = doc["mode"]; 
+  const char* range = doc["range"];
   int duration = doc["duration"]; // 30
+  int day = doc["day"]; // 30
 
-  if(strcmp(status,"on") == 0){
-    digitalWrite(relay[port], HIGH);   // Turn on relay 1
+
+
+  if(strcmp(status,"set-day") == 0){
+    preferences.begin("template", false);
+       preferences.putInt("day", day);     
+    preferences.end();
+  }else if(strcmp(status,"on") == 0){
+    digitalWrite(getPort(port), HIGH);   // Turn on relay 1
     if(duration > 0){
       delay(1000*duration);
-      digitalWrite(relay[port], LOW);
+      digitalWrite(getPort(port), LOW);
     }
   }else{
-     digitalWrite(relay[port], LOW);
+     digitalWrite(getPort(port), LOW);
      if(duration > 0){
       delay(1000*duration);
-      digitalWrite(relay[port], HIGH);
+      digitalWrite(getPort(port), HIGH);
     }
   }
 
   deviceCommand = "none";
 
   Serial.println("Update status:");
-  Serial.println(publishState(getCommandStatus(now, port, status, duration)));
+  Serial.println(publishState(getCommandStatus(now, mode, range, status, day, port, duration)));
 
 }
 
-void checkConfig(){
+void processTimer(){
 
   String now = getLocalTime();
 
-  char json[deviceConfig.length()];
-  deviceConfig.toCharArray(json, deviceConfig.length());
-
-  const size_t capacity = JSON_ARRAY_SIZE(6) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(2) + 6*JSON_OBJECT_SIZE(4) + 260;
-  DynamicJsonDocument doc(capacity);
-  
-  //const char* json = "{\"schedule\":{\"enable\":true,\"timer\":[{\"port\":0,\"time\":\"07:00\",\"duration\":10},{\"port\":0,\"time\":\"12:00\",\"duration\":10},{\"port\":0,\"time\":\"17:00\",\"duration\":10},{\"port\":1,\"time\":\"07:00\",\"duration\":10},{\"port\":1,\"time\":\"12:00\",\"duration\":10},{\"port\":1,\"time\":\"17:00\",\"duration\":10}]}}";
-  
-  deserializeJson(doc, json);
-  const char* configVersion = doc["version"]; // "0.1";
-  bool schedule_enable = doc["schedule"]["enable"]; // true
-  JsonArray schedule_timer = doc["schedule"]["timer"];
-
-//check firmware version
-    preferences.begin("config", false);
-       String selfVersion  =  preferences.getString("version", "none");     
-    preferences.end();
-  if(selfVersion != String(configVersion)){
-    updateFirmware(configVersion);
-  
-  }
-
-  
-
   char *token;
 
-  for(int i = 0; i < sizeof(schedule_timer); i++){
-    schedule_timer[i];
-     int port = schedule_timer[i]["port"]; // 0
-     const char* status = schedule_timer[i]["status"]; // "on"
-     const char* time = schedule_timer[i]["time"]; // "07:00"
-     int duration = schedule_timer[i]["duration"]; // 10
+  for(int i = 0; i < sizeof(timerArray); i++){
+    
+     const char*  port = timerArray[i]["port"]; // 0
+     const char* status = timerArray[i]["status"]; // "on"
+     const char* time = timerArray[i]["time"]; // "07:00"
+     int duration = timerArray[i]["duration"]; // 10
 
      String timeStr = String(time);
 
@@ -254,74 +331,226 @@ void checkConfig(){
     //Serial.print("Is triger for " + timeStr + ": ");
     //Serial.println(trigger);
     if(trigger){
-
-
       if(strcmp(status,"on") == 0){
-        digitalWrite(relay[port], HIGH);   // Turn on relay 1
+        digitalWrite(getPort(port), HIGH);   // Turn on relay 1
         if(duration > 0){
           delay(1000*duration);
-          digitalWrite(relay[port], LOW);
+          digitalWrite(getPort(port), LOW);
         }
       }else{
-         digitalWrite(relay[port], LOW);
+         digitalWrite(getPort(port), LOW);
          if(duration > 0){
           delay(1000*duration);
-          digitalWrite(relay[port], HIGH);
+          digitalWrite(getPort(port), HIGH);
         }
       }
-
-      
-      Serial.println(publishState(getScheduleStatus(now, port, status, timeStr, duration)));
+      publishState(getScheduleStatus(now, port, status, timeStr, duration));
       delay(60000-1000*duration+1);
     
     }
-     
   }
-/*
-  Serial.print("Current Time: ");
-  Serial.print(hour());
-  Serial.print(":");
-  Serial.print(minute());
-  Serial.print(":");
-  Serial.println(second());
-*/
-  /*
-  JsonObject schedule_timer_0 = schedule_timer[0];
-  int schedule_timer_0_port = schedule_timer_0["port"]; // 0
-  const char* schedule_timer_0_time = schedule_timer_0["time"]; // "07:00"
-  int schedule_timer_0_duration = schedule_timer_0["duration"]; // 10
-  
-  JsonObject schedule_timer_1 = schedule_timer[1];
-  int schedule_timer_1_port = schedule_timer_1["port"]; // 0
-  const char* schedule_timer_1_time = schedule_timer_1["time"]; // "12:00"
-  int schedule_timer_1_duration = schedule_timer_1["duration"]; // 10
-  
-  JsonObject schedule_timer_2 = schedule_timer[2];
-  int schedule_timer_2_port = schedule_timer_2["port"]; // 0
-  const char* schedule_timer_2_time = schedule_timer_2["time"]; // "17:00"
-  int schedule_timer_2_duration = schedule_timer_2["duration"]; // 10
-  
-  JsonObject schedule_timer_3 = schedule_timer[3];
-  int schedule_timer_3_port = schedule_timer_3["port"]; // 1
-  const char* schedule_timer_3_time = schedule_timer_3["time"]; // "07:00"
-  int schedule_timer_3_duration = schedule_timer_3["duration"]; // 10
-  
-  JsonObject schedule_timer_4 = schedule_timer[4];
-  int schedule_timer_4_port = schedule_timer_4["port"]; // 1
-  const char* schedule_timer_4_time = schedule_timer_4["time"]; // "12:00"
-  int schedule_timer_4_duration = schedule_timer_4["duration"]; // 10
-  
-  JsonObject schedule_timer_5 = schedule_timer[5];
-  int schedule_timer_5_port = schedule_timer_5["port"]; // 1
-  const char* schedule_timer_5_time = schedule_timer_5["time"]; // "17:00"
-  int schedule_timer_5_duration = schedule_timer_5["duration"]; // 10
+}
 
-  */
-
+void foggySprout(int foggySproutDuration) {
+  String now = getLocalTime();
   
+  digitalWrite(foggyValve, HIGH);   // Turn on relay 1
+  delay(1000*foggySproutDuration);
+  digitalWrite(foggyValve, LOW);
+ 
+  publishState(getProcessActivityStatus(now, "foggy-sprout"));
+}
 
 
 
+void mixFertilizer(int mixFertilizerPumpDuration, int mixFertilizerWateringValveDuration){
+  String now = getLocalTime();
+  
+//100cc/ต้น
+  digitalWrite(mixFertilizerPump, HIGH);   // Turn on relay 1
+  delay(1000*mixFertilizerPumpDuration);
+  digitalWrite(mixFertilizerPump, LOW);
+
+//900cc/ต้น
+  digitalWrite(wateringValve, HIGH);   // Turn on relay 1
+  delay(1000*mixFertilizerWateringValveDuration);
+  digitalWrite(wateringValve, LOW);
+
+
+  publishState(getProcessActivityStatus(now, "mix-fertilizer"));
+  
+}
+
+void potassium(int potassiumPumpDuration, int potassiumWateringValveDuration){
+  String now = getLocalTime();
+  
+//100cc/ต้น
+  digitalWrite(potassiumPump, HIGH);   // Turn on relay 1
+  delay(1000*potassiumPumpDuration);
+  digitalWrite(potassiumPump, LOW);
+
+//400cc/ต้น
+  digitalWrite(wateringValve, HIGH);   // Turn on relay 1
+  delay(1000*potassiumWateringValveDuration);
+  digitalWrite(wateringValve, LOW);
+
+  publishState(getProcessActivityStatus(now, "mix-potassium"));
+  
+}
+void watering(int wateringPumpDuration) {
+   String now = getLocalTime();
+  digitalWrite(wateringPump, HIGH);   // Turn on relay 1
+  delay(1000*wateringPumpDuration);
+  digitalWrite(wateringPump, LOW);
+  publishState(getProcessActivityStatus(now, "watering"));
+}
+void potassiumWatering(int potassiumWateringPumpDuration) {
+  String now = getLocalTime();
+  digitalWrite(wateringPump, HIGH);   // Turn on relay 1
+  delay(1000*potassiumWateringPumpDuration);
+  digitalWrite(wateringPump, LOW);
+  publishState(getProcessActivityStatus(now, "potassium-watering"));
+}
+
+void foliarSprout(int foggySproutDuration) {
+  String now = getLocalTime();
+  digitalWrite(foliarPump, HIGH);   // Turn on relay 1
+  delay(1000*foggySproutDuration);
+  digitalWrite(foliarPump, LOW);
+
+  publishState(getProcessActivityStatus(now, "foliar-sprout"));
+}
+
+void foliar(int foliarDuration) {
+  String now = getLocalTime();
+  digitalWrite(foliarPump, HIGH);   // Turn on relay 1
+  delay(1000*foliarDuration);
+  digitalWrite(foliarPump, LOW);
+  
+  publishState(getProcessActivityStatus(now, "foliar"));
+}
+
+void processTemplate(){
+
+    preferences.begin("template", false);
+      int day = preferences.getInt("day", 0);     
+    preferences.end();
+  
+  const char* mode = templateObject["mode"]; // "melon"
+  const char* range = templateObject["range"]; // "medium"
+  
+  JsonObject properties = templateObject["properties"];
+  int foggySproutDuration = properties["foggySproutDuration"]; // 15
+  int foliarSproutDuration = properties["foliarSproutDuration"]; // 10
+  int mixFertilizerPumpDuration = properties["mixFertilizerPumpDuration"]; // 15
+  int mixFertilizerWateringValveDuration = properties["mixFertilizerWateringValveDuration"]; // 20
+  int wateringPumpDuration = properties["wateringPumpDuration"]; // 30
+  int potassiumPumpDuration = properties["potassiumPumpDuration"]; // 15
+  int potassiumWateringValveDuration = properties["potassiumWateringValveDuration"]; // 10
+  int potassiumWateringPumpDuration = properties["potassiumWateringPumpDuration"]; // 30
+  int foliarDuration = properties["foliarDuration"]; // 20
+
+  int potassiumOffset = 0;
+
+  if(strcmp(range, "short") == 0){
+    potassiumOffset = 0;
+  }else if(strcmp(range, "medium") == 0){
+    potassiumOffset = 2;
+  }else {
+    potassiumOffset = 15;
+  }
+
+  if(isTrigger("00", "00")){
+    day++;
+    preferences.begin("template", false);
+       preferences.putInt("day", day);     
+    preferences.end();
+  }
+
+  if(day >= 1 && day <= 13){
+    if(isTrigger("07", "00") || isTrigger("12", "00") || isTrigger("17", "00")){
+       foggySprout(foggySproutDuration);
+    }
+  }
+  if(day == 14){
+    if(isTrigger("07", "00") || isTrigger("12", "00")){
+      foggySprout(foggySproutDuration);
+    }
+  }
+
+  if(day == 5 || day == 8 || day == 11){
+    if(isTrigger("06", "00")){
+       foliarSprout(foliarSproutDuration);
+    }
+  }
+
+  if(day >= 15 && day <= 70){
+
+    if(isTrigger("06", "00")){
+       mixFertilizer(mixFertilizerPumpDuration, mixFertilizerWateringValveDuration);
+    }
+    if(isTrigger("07", "00") || isTrigger("12", "00") || isTrigger("17", "00")){
+       watering(wateringPumpDuration);
+    }
+  }
+
+
+  if(day >= 71 && day <= 80+potassiumOffset){
+
+    if(isTrigger("06", "00")){
+       potassium(potassiumPumpDuration, potassiumWateringValveDuration);
+    }
+    if(isTrigger("07", "00") || isTrigger("12", "00") || isTrigger("17", "00")){
+       potassiumWatering(potassiumWateringPumpDuration);
+    }
+  }
+  
+//17-24-32-39-46-53-60-67
+  if(day == 17 || day == 24 || day == 32 || day == 39 || day == 46 || day == 53 || day == 60 || day == 67 || day == 71+potassiumOffset || day == 74+potassiumOffset || day == 77+potassiumOffset || day == 80+potassiumOffset ){
+    if(isTrigger("06", "00")){
+       foliar(foliarDuration);
+    }
+  }
+
+}
+
+void process(){
+
+  
+
+  const size_t capacity = JSON_ARRAY_SIZE(6) + 2*JSON_OBJECT_SIZE(3) + 6*JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(9) + 640;
+  DynamicJsonDocument doc(capacity);
+  
+  char json[deviceConfig.length()];
+  deviceConfig.toCharArray(json, deviceConfig.length());
+   
+  deserializeJson(doc, json);
+  
+  const char* version = doc["version"]; // "0.2"
+
+
+
+
+  //check firmware version
+  preferences.begin("config", false);
+     String selfVersion  =  preferences.getString("version", "none");     
+  preferences.end();
+  if(selfVersion != String(version)){
+    updateFirmware(version);
+  }
+
+
+  templateObject = doc["template"];
+  timerArray = doc["timer"];
+  
+  
+  if(templateObject != NULL){
+     processTemplate();
+  }
+
+  if(timerArray != NULL){
+    processTimer();
+  }
 }
 
 // The MQTT callback function for commands and configuration updates

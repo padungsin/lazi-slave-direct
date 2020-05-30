@@ -1,18 +1,26 @@
 {
 	"version": 0.2,
 	"status": "connected",
+	"mode": "melon",
+	"range": "medium",
+	"day": 1,
 	"lastActivity": {
 		"date": "2020-05-05 12:00:58",
 		"timer": {
-			"port": 0,
+			"port": "foggyValve",
 			"status": "on",
 			"time": "07:00",
 			"duration": 60
 		},
 		"command": {
-			"port": 0,
-			"status": "on",
-			"duration": 20
+			"status": "start-melon",
+			"range": "medium",
+			"day": 1,
+			"port": "foggyValve",
+			"duration": 5
+		},
+		"template": {
+			"activity": "mix-fertilizer"
 		}
 	}
 }

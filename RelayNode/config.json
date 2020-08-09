@@ -1,56 +1,76 @@
 {
-	"version": "0.2",
-	"template": {
-		"mode": "melon",
-		"range": "medium",
-		"properties": {
-			"foggySproutDuration": 15,
-			"foliarSproutDuration": 10,
-			"mixFertilizerPumpDuration": 15,
-			"mixFertilizerWateringValveDuration": 20,
-			"wateringPumpDuration": 30,
-			"potassiumPumpDuration": 15,
-			"potassiumWateringValveDuration": 10,
-			"potassiumWateringPumpDuration": 30,
-			"foliarDuration": 20
-		}
-	},
-	"timer": [
-		{
-			"port": "wateringPump",
-			"status": "on",
-			"time": "07:00",
-			"duration": 60
+	"version": "0.0.4",
+	"t": {
+		"m": "melon",
+		"r": "medium",
+		"c": "00:00",
+		"port": {
+			"fv": 23,
+			"wv": 22,
+			"wp": 19,
+			"mfp": 18,
+			"kp": 5,
+			"fp": 17,
+			"fkn": 16,
+			"mxkn": 4,
+			"acth": false
 		},
-		{
-			"port": "wateringPump",
-			"status": "on",
-			"time": "12:00",
-			"duration": 60
+		"p": {
+			"foggyspdrtn": 15,
+			"wvdrtn": 30,
+			"foliarspdrtn": 10,
+			"mixpdrtn": 15,
+			"mixwvdrtn": 20,
+			"wpdrtn": 30,
+			"kpdrtn": 15,
+			"kwvdrtn": 10,
+			"kwpdrtn": 30,
+			"foliardrtn": 20,
+			"kndrtn": 30
 		},
-		{
-			"port": "wateringPump",
-			"status": "on",
-			"time": "17:00",
-			"duration": 60
-		},
-		{
-			"port": "wateringPump",
-			"status": "on",
-			"time": "07:00",
-			"duration": 60
-		},
-		{
-			"port": "wateringPump",
-			"status": "on",
-			"time": "12:00",
-			"duration": 60
-		},
-		{
-			"port": "wateringPump",
-			"status": "on",
-			"time": "17:00",
-			"duration": 60
-		}
-	]
+		"timer": [
+			{
+				"time": "07:00",
+				"port": 12,
+				"status": "on",
+				"drtn": 20 
+			
+			},
+			{
+				"time": "08:00",
+				"port": 14,
+				"status": "on",
+				"drtn": 20 
+			
+			},
+			{
+				"time": "09:00",
+				"port": 25,
+				"status": "on",
+				"drtn": 20 
+			
+			},
+			{
+				"time": "10:00",
+				"port": 26,
+				"status": "on",
+				"drtn": 20 
+			
+			},
+			{
+				"time": "11:00",
+				"port": 27,
+				"status": "on",
+				"drtn": 20 
+			
+			},
+			{
+				"time": "12:00",
+				"port": 32,
+				"status": "on",
+				"drtn": 20 
+			
+			}
+		]
+	}
 }

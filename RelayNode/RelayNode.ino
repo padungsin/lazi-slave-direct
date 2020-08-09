@@ -13,9 +13,10 @@
 void setup() {
   Serial.begin(115200);
   setupWifi();
+  setDeviceId();                                                                                                                                                                                 
   setupCloudIoT();
 
-
+/*
 
  pinMode(foggyValve, OUTPUT);     // Initialize the relay1 pin as an output
  pinMode(wateringValve, OUTPUT);     // Initialize the relay2 pin as an output
@@ -23,6 +24,14 @@ void setup() {
  pinMode(mixFertilizerPump, OUTPUT);     // Initialize the relay2 pin as an output
  pinMode(potassiumPump, OUTPUT);     // Initialize the relay1 pin as an output
  pinMode(foliarPump, OUTPUT);     // Initialize the relay2 pin as an output
+
+ digitalWrite(foggyValve, HIGH);
+ digitalWrite(wateringValve, HIGH);
+ digitalWrite(wateringPump, HIGH);
+ digitalWrite(mixFertilizerPump, HIGH);
+ digitalWrite(potassiumPump, HIGH);
+ digitalWrite(foliarPump, HIGH);
+*/
 
   delay(2000);
 } //  END setup()
@@ -58,7 +67,7 @@ void loop()
 
     process();
 
-    delay(500);
+    delay(1000);
 /*    if(deviceCommand != "none"){
       executeCommand();
     }*/

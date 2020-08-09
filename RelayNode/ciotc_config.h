@@ -22,13 +22,8 @@
 const char *project_id = "smartmanipulator";
 const char *location = "asia-east1";
 const char *registry_id = "po-registry";
-const char *device_id = "dev-3C-71-BF-8C-1B-E4";
+char device_id[22];
 
-
-
-#ifndef LED_BUILTIN
-#define LED_BUILTIN 13
-#endif
 
 // To get the private key run (where private-key.pem is the ec private key
 // used to create the certificate uploaded to google cloud iot):

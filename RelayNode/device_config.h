@@ -18,7 +18,7 @@ class DeviceTemplateProperty {
   int potassiumPumpDuration;
   int potassiumWateringValveDuration;
   int potassiumWateringPumpDuration;
-  int kneadDuration;
+  int otherWateringDuration;
   int foliarDuration;
 };
 class DevicePort {

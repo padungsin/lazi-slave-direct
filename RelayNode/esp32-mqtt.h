@@ -17,7 +17,7 @@
 #define __ESP32_MQTT_H__
 
 #include <Client.h>
-#include <WiFi.h>
+//#include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <Preferences.h>  // WiFi storage
 #include <TimeLib.h>
@@ -151,6 +151,29 @@ void invertTrigger(int port, int duration){
     digitalWrite(port, HIGH);
   }
 }
+
+
+void changeState(int port, boolean on){
+  Serial.print("Active High:");
+  Serial.println(deviceConfig->deviceTemplate->devicePort->relayActiveHigh);
+
+
+  if(on){
+    if(!deviceConfig->deviceTemplate->devicePort->relayActiveHigh){
+      digitalWrite(port, LOW);   // Turn on relay 1
+    }else{
+      digitalWrite(port, HIGH);   // Turn on relay 1
+    }
+   }else {
+    
+    if(!deviceConfig->deviceTemplate->devicePort->relayActiveHigh){
+      digitalWrite(port, HIGH);   // Turn on relay 1
+    }else{
+      digitalWrite(port, LOW);   // Turn on relay 1
+    }
+   }
+
+}
 ///////////////////////////////
 // extract json
 ///////////////////////////////
@@ -184,9 +207,9 @@ void extractConfig(String jsonConfig){
     devicePort->mixFertilizerPump = jsonDevicePort["mfp"]; // 26
     devicePort->potassiumPump = jsonDevicePort["kp"]; // 27
     devicePort->foliarPump = jsonDevicePort["fp"]; // 32
-    devicePort->fertilizerKnead = jsonDevicePort["fkn"]; // 27
-    devicePort->otherWateringValve = jsonDevicePort["owv"]; // 32
-    devicePort->light = jsonDevicePort["lght"]; // false
+    devicePort->otherWateringValve = jsonDevicePort["owv"]; // 27
+    devicePort->light = jsonDevicePort["lght"]; // 32
+    devicePort->relayActiveHigh = jsonDevicePort["acth"]; // false
 
     deviceTemplate->devicePort = devicePort;
 
@@ -205,7 +228,7 @@ void extractConfig(String jsonConfig){
     property->potassiumWateringValveDuration = jsonProperty["kwvdrtn"]; // 10
     property->potassiumWateringPumpDuration = jsonProperty["kwpdrtn"]; // 30
     property->foliarDuration = jsonProperty["foliardrtn"]; // 20
-    property->kneadDuration = jsonProperty["kndrtn"]; // 30
+    property->otherWateringDuration = jsonProperty["othdrtn"]; // 30
     deviceTemplate->property = property;
 
     deviceConfig->deviceTemplate = deviceTemplate;
@@ -516,8 +539,8 @@ void pureWater(){
 void mixFertilizer(){
   String now = getLocalTime();
   //คนปุ๋ย
-  trigger(deviceConfig->deviceTemplate->devicePort->fertilizerKnead, deviceConfig->deviceTemplate->property->kneadDuration);
-  publishState(getProcessActivityStatus(now, "knead-fertilizer",deviceConfig->deviceTemplate->devicePort->fertilizerKnead, deviceConfig->deviceTemplate->property->kneadDuration));
+  //trigger(deviceConfig->deviceTemplate->devicePort->fertilizerKnead, deviceConfig->deviceTemplate->property->kneadDuration);
+  //publishState(getProcessActivityStatus(now, "knead-fertilizer",deviceConfig->deviceTemplate->devicePort->fertilizerKnead, deviceConfig->deviceTemplate->property->kneadDuration));
   
   //100cc/ต้น
   trigger(deviceConfig->deviceTemplate->devicePort->mixFertilizerPump, deviceConfig->deviceTemplate->property->mixFertilizerPumpDuration);
@@ -526,10 +549,12 @@ void mixFertilizer(){
   //900cc/ต้น
   trigger(deviceConfig->deviceTemplate->devicePort->wateringValve, deviceConfig->deviceTemplate->property->mixFertilizerWateringValveDuration);
   publishState(getProcessActivityStatus(now, "pump-water-fertilizer", deviceConfig->deviceTemplate->devicePort->wateringValve, deviceConfig->deviceTemplate->property->mixFertilizerWateringValveDuration));
-  
+
+  /*
   if(deviceConfig->deviceTemplate->property->mixFertilizerPumpDuration+deviceConfig->deviceTemplate->property->mixFertilizerWateringValveDuration < 60){
     delay(60000-1000*(deviceConfig->deviceTemplate->property->mixFertilizerPumpDuration+deviceConfig->deviceTemplate->property->mixFertilizerWateringValveDuration + deviceConfig->deviceTemplate->property->kneadDuration));
   }
+  */
 
 }
 
@@ -556,14 +581,15 @@ void watering() {
    String now = getLocalTime();
 
 //คน
+/*
    trigger(deviceConfig->deviceTemplate->devicePort->mixWateringKnead, deviceConfig->deviceTemplate->property->kneadDuration);
    publishState(getProcessActivityStatus(now, "knead-watering", deviceConfig->deviceTemplate->devicePort->mixWateringKnead, deviceConfig->deviceTemplate->property->kneadDuration));
-
+*/
    trigger(deviceConfig->deviceTemplate->devicePort->wateringPump, deviceConfig->deviceTemplate->property->wateringPumpDuration);
    publishState(getProcessActivityStatus(now, "watering", deviceConfig->deviceTemplate->devicePort->wateringPump, deviceConfig->deviceTemplate->property->wateringPumpDuration));
 
   if(deviceConfig->deviceTemplate->property->wateringPumpDuration < 60){
-    delay(60000-1000*(deviceConfig->deviceTemplate->property->wateringPumpDuration + deviceConfig->deviceTemplate->property->kneadDuration));
+    delay(60000-1000*(deviceConfig->deviceTemplate->property->wateringPumpDuration));
   }
 }
 void potassiumWatering() {
@@ -601,11 +627,33 @@ void foliar() {
   
 }
 
+void otherWatering() {
+  String now = getLocalTime();
+
+  trigger(deviceConfig->deviceTemplate->devicePort->otherWateringValve, deviceConfig->deviceTemplate->property->otherWateringDuration);
+
+  publishState(getProcessActivityStatus(now, "other-watering", deviceConfig->deviceTemplate->devicePort->otherWateringValve, deviceConfig->deviceTemplate->property->otherWateringDuration));
+  if(deviceConfig->deviceTemplate->property->otherWateringDuration < 60){
+    delay(60000-1000*deviceConfig->deviceTemplate->property->potassiumWateringPumpDuration);
+  }
+}
+
 void processTemplate(){
 
     preferences.begin("template", false);
       int day = preferences.getInt("day", 0);     
     preferences.end();
+
+
+    if(isTrigger("08", "00")){
+      changeState(deviceConfig->deviceTemplate->devicePort->light, true);
+    }
+
+    if(isTrigger("16", "00")){
+      changeState(deviceConfig->deviceTemplate->devicePort->light, false);
+    }
+  
+    
   /*
   const char* mode = templateObject["mode"]; // "melon"
   const char* range = templateObject["range"]; // "medium"
@@ -645,7 +693,7 @@ void processTemplate(){
 
   //temp for other plant
     if(isTrigger("07", "00") || isTrigger("17", "00")){
-       foggySprout();
+       otherWatering();
     }
 
 /*

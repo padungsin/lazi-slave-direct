@@ -130,12 +130,16 @@ void trigger(int port, int duration){
 
   if(!deviceConfig->deviceTemplate->devicePort->relayActiveHigh){
     digitalWrite(port, LOW);   // Turn on relay 1
-    delay(1000*duration);
-    digitalWrite(port, HIGH);  
+    if(duration > 0){
+      delay(1000*duration);
+      digitalWrite(port, HIGH);  
+    }
   }else{
     digitalWrite(port, HIGH);   // Turn on relay 1
-    delay(1000*duration);
-    digitalWrite(port, LOW);
+    if(duration > 0){
+      delay(1000*duration);
+      digitalWrite(port, LOW);
+    }
   }
 }
 
@@ -143,12 +147,17 @@ void invertTrigger(int port, int duration){
 
   if(!deviceConfig->deviceTemplate->devicePort->relayActiveHigh){
     digitalWrite(port, HIGH);   // Turn on relay 1
-    delay(1000*duration);
-    digitalWrite(port, LOW);  
+    if(duration > 0){
+      delay(1000*duration);
+      digitalWrite(port, LOW);  
+    }
+    
   }else{
     digitalWrite(port, LOW);   // Turn on relay 1
-    delay(1000*duration);
-    digitalWrite(port, HIGH);
+    if(duration > 0){
+      delay(1000*duration);
+      digitalWrite(port, HIGH);
+    }
   }
 }
 
@@ -679,7 +688,7 @@ void processTemplate(){
     potassiumOffset = 15;
   }
 
-
+//change day
   if(isTrigger(deviceConfig->deviceTemplate->cutOff.substring(0, deviceConfig->deviceTemplate->cutOff.indexOf(":")), deviceConfig->deviceTemplate->cutOff.substring(deviceConfig->deviceTemplate->cutOff.indexOf(":")+1))){
     day++;
     Serial.print("Change Day: ");
@@ -732,7 +741,7 @@ void processTemplate(){
     if(isTrigger("06", "00")){
        mixFertilizer();
     }
-    if(isTrigger("07", "00") || isTrigger("12", "00") || isTrigger("17", "00")){
+    if(isTrigger("07", "00") || isTrigger("09", "00") || isTrigger("11", "00")|| isTrigger("13", "00")|| isTrigger("15", "00")|| isTrigger("17", "00")){
        watering();
     }
   }
